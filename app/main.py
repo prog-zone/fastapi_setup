@@ -18,4 +18,4 @@ app.include_router(api_router, prefix="/api/v1")
 
 @app.get("/")
 def read_root():
-    return {"message": "Job Autofill API is running"}
+    return {"message": f"{settings.PROJECT_NAME} API is running"}

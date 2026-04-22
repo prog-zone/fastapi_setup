@@ -1,6 +1,6 @@
 import jwt
 import uuid
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -10,11 +10,12 @@ from app.core.database import get_db
 from app.models.user import User
 
 # This looks for the "Authorization: Bearer <token>" header
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
 async def get_current_user(
+    request: Request,
     db: AsyncSession = Depends(get_db), 
-    token: str = Depends(oauth2_scheme)
+    token_header: str | None = Depends(oauth2_scheme)
 ) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -22,6 +23,11 @@ async def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
     
+    token = request.cookies.get("access_token") or token_header
+
+    if not token:
+         raise credentials_exception
+
     try:
         # 1. Decode the Access Token
         payload = jwt.decode(
@@ -29,6 +35,8 @@ async def get_current_user(
             settings.JWT_SECRET_KEY, 
             algorithms=[settings.JWT_ALGORITHM]
         )
+        if payload.get("type") == "refresh":
+            raise credentials_exception
         user_id_str: str = payload.get("sub")
         if user_id_str is None:
             raise credentials_exception

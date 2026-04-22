@@ -1,12 +1,30 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "Job Autofill API"
-    DATABASE_URL: str
-    JWT_SECRET_KEY: str = "your-super-secret-key-here"
+    PROJECT_NAME: str
+    
+    # Database Configuration
+    POSTGRES_USER: str
+    POSTGRES_PASSWORD: str
+    POSTGRES_DB: str
+    DB_HOST: str = "localhost"
+
+    # JWT Configuration
+    JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    # Email Configuration
+    MAIL_HOST: str
+    MAIL_USERNAME: str
+    MAIL_PASSWORD: str
+    MAIL_FROM: str
+    MAIL_PORT: int
+
+    @property
+    def database_url(self) -> str:
+        return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.DB_HOST}:5432/{self.POSTGRES_DB}"
     
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
