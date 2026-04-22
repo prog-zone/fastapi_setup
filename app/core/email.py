@@ -27,3 +27,14 @@ async def send_verification_email(email_to: EmailStr, otp: str):
     )
     fm = FastMail(conf)
     await fm.send_message(message)
+
+
+async def send_reset_password_email(email_to: EmailStr, otp: str):
+    message = MessageSchema(
+        subject="Password Reset Request",
+        recipients=[email_to],
+        body=f"Your password reset code is: {otp}. It expires in 15 minutes. If you did not request this, please ignore this email.",
+        subtype="html"
+    )
+    fm = FastMail(conf)
+    await fm.send_message(message)

@@ -12,8 +12,8 @@ dependencies = [
     "pwdlib[argon2]",
     "pyjwt",
     "greenlet",
-    "fastapi-mail>=1.6.2",
-    "slowapi>=0.1.9",
+    "fastapi-mail",
+    "slowapi",
 ]
 
 [tool.fastapi]

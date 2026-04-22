@@ -1,13 +1,13 @@
 import jwt
 import uuid
+from typing import List
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-
 from app.core.config import settings
 from app.core.database import get_db
-from app.models.user import User
+from app.models.user import User, Role
 
 # This looks for the "Authorization: Bearer <token>" header
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)

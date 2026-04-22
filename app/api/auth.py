@@ -12,8 +12,8 @@ from app.core.security import get_password_hash, verify_password, create_access_
 from app.core.limiter import limiter
 from app.api.deps import get_current_user
 from app.models.user import User, UserRefreshToken
-from app.schemas.user import UserCreateSchema, UserSchema, UserBaseSchema, TokenRequestSchema, VerifyEmailRequestSchema
-from app.core.email import send_verification_email, generate_otp
+from app.schemas.user import UserCreateSchema, UserSchema, UserBaseSchema, VerifyEmailRequestSchema, ForgotPasswordRequest, ResetPasswordRequest
+from app.core.email import send_verification_email, generate_otp, send_reset_password_email
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -159,8 +159,8 @@ async def login(
 
 
 @router.post("/refresh")
+@limiter.limit("3/minute")
 async def refresh_token(request: Request, response: Response, db: AsyncSession = Depends(get_db)):
-    # Read refresh token from cookie
     refresh_token = request.cookies.get("refresh_token")
     if not refresh_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token missing")
@@ -234,7 +234,6 @@ async def logout(request: Request, response: Response, db: AsyncSession = Depend
         except jwt.PyJWTError:
             pass
 
-    # Clear both cookies
     response.delete_cookie(key="access_token")
     response.delete_cookie(key="refresh_token")
 
@@ -247,15 +246,80 @@ async def logout_all_devices(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # 1. Invalidate all refresh tokens in the database
     query = delete(UserRefreshToken).where(UserRefreshToken.user_id == current_user.id)
     await db.execute(query)
     await db.commit()
 
-    # 2. Clear the cookies for the current active device
     response.delete_cookie(key="access_token")
     response.delete_cookie(key="refresh_token")
 
     return {
         "message": "Successfully logged out from all devices."
     }
+
+
+@router.post("/forgot-password")
+@limiter.limit("3/minute")
+async def forgot_password(
+    request: Request,
+    body: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db)
+):
+    query = select(User).where(User.email == body.email)
+    result = await db.execute(query)
+    user = result.scalar_one_or_none()
+
+    # Generic response to prevent email enumeration (hackers checking if an email exists)
+    generic_response = {"message": "If that email exists in our system, a password reset code has been sent."}
+
+    if not user:
+        return generic_response
+
+    # Generate new OTP, hash it, and set expiration
+    raw_otp = generate_otp()
+    user.resetpass_code = get_password_hash(raw_otp)
+    user.resetpass_expire = datetime.now(timezone.utc) + timedelta(minutes=15)
+    
+    await db.commit()
+    
+    background_tasks.add_task(send_reset_password_email, user.email, raw_otp)
+    
+    return generic_response
+
+
+@router.post("/reset-password")
+@limiter.limit("5/minute")
+async def reset_password(
+    request: Request,
+    body: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    query = select(User).where(User.email == body.email)
+    result = await db.execute(query)
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        
+    if not user.resetpass_code or not user.resetpass_expire:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No password reset requested")
+
+    if datetime.now(timezone.utc) > user.resetpass_expire:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Reset code has expired")
+
+    if not verify_password(body.code, user.resetpass_code):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid reset code")
+
+    user.hashed_password = get_password_hash(body.new_password)
+    
+    user.resetpass_code = None
+    user.resetpass_expire = None
+    
+    # SECURITY CRITICAL: Invalidate all existing sessions (Logout from all devices)
+    delete_sessions_query = delete(UserRefreshToken).where(UserRefreshToken.user_id == user.id)
+    await db.execute(delete_sessions_query)
+
+    await db.commit()
+    
+    return {"message": "Password has been reset successfully. All active sessions have been logged out."}
