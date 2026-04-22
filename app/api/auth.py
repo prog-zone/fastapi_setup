@@ -9,6 +9,7 @@ import uuid
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import get_password_hash, verify_password, create_access_token, create_refresh_token
+from app.core.limiter import limiter
 from app.api.deps import get_current_user
 from app.models.user import User, UserRefreshToken
 from app.schemas.user import UserCreateSchema, UserSchema, UserBaseSchema, TokenRequestSchema, VerifyEmailRequestSchema
@@ -44,7 +45,12 @@ async def register(user_in: UserCreateSchema, background_tasks: BackgroundTasks,
 
 
 @router.post("/verify-email")
-async def verify_email(body: VerifyEmailRequestSchema, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/minute")
+async def verify_email(
+    request: Request,
+    body: VerifyEmailRequestSchema,
+    db: AsyncSession = Depends(get_db)
+    ):
     query = select(User).where(User.email == body.email)
     result = await db.execute(query)
     user = result.scalar_one_or_none()
@@ -73,7 +79,9 @@ async def verify_email(body: VerifyEmailRequestSchema, db: AsyncSession = Depend
     return {"message": "Email successfully verified"}
 
 @router.post("/resend-verification")
+@limiter.limit("3/minute")
 async def resend_verification(
+    request: Request,
     body: UserBaseSchema,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db)
@@ -101,7 +109,9 @@ async def resend_verification(
 
 
 @router.post("/login")
+@limiter.limit("5/minute")
 async def login(
+    request: Request,
     response: Response,
     db: AsyncSession = Depends(get_db), 
     form_data: OAuth2PasswordRequestForm = Depends()
