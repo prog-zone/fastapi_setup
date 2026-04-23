@@ -38,9 +38,15 @@ async def register(user_in: UserCreateSchema, background_tasks: BackgroundTasks,
         verification_code=get_password_hash(raw_otp),
         verification_expire=datetime.now(timezone.utc) + timedelta(minutes=15)
     )
-    db.add(new_user)
-    await db.commit()
-    await db.refresh(new_user)
+    
+    try:
+        db.add(new_user)
+        await db.commit()
+        await db.refresh(new_user)
+    except Exception as e:
+        await db.rollback()
+        log.error("registration_db_transaction_failed", error=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not register user")
 
     background_tasks.add_task(send_verification_email, user_in.email, raw_otp)
     
@@ -152,13 +158,18 @@ async def login(
     access_token = create_access_token(user.id)
     refresh_token_str, jti = create_refresh_token(user.id)
     
-    db_refresh_token = UserRefreshToken(
-        user_id=user.id,
-        token_jti=jti,
-        expires_at=datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS) 
-    )
-    db.add(db_refresh_token)
-    await db.commit()
+    try:
+        db_refresh_token = UserRefreshToken(
+            user_id=user.id,
+            token_jti=jti,
+            expires_at=datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS) 
+        )
+        db.add(db_refresh_token)
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        log.error("login_db_transaction_failed", error=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not complete login")
 
     # Set both tokens as HttpOnly cookies
     response.set_cookie(
