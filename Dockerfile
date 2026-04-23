@@ -12,11 +12,11 @@ ENV UV_COMPILE_BYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 COPY pyproject.toml .
-RUN uv sync --frozen --no-install-project --no-dev
+RUN uv sync --no-install-project --no-dev
 
 COPY . .
 
-RUN uv sync --frozen --no-dev && \
+RUN uv sync --no-dev && \
     chown -R appuser:appuser /app
 
 USER appuser
