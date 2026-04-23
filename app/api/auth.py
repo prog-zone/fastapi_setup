@@ -6,6 +6,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 
+from app.core.logger import log
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import get_password_hash, verify_password, create_access_token, create_refresh_token
@@ -25,6 +26,7 @@ async def register(user_in: UserCreateSchema, background_tasks: BackgroundTasks,
     query = select(User).where(User.email == user_in.email)
     result = await db.execute(query)
     if result.scalar_one_or_none():
+        log.warning("registration_failed_user_exists", email=user_in.email)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User already exists")
     
     raw_otp = generate_otp()
@@ -41,6 +43,9 @@ async def register(user_in: UserCreateSchema, background_tasks: BackgroundTasks,
     await db.refresh(new_user)
 
     background_tasks.add_task(send_verification_email, user_in.email, raw_otp)
+    
+    log.info("user_registered_successfully", user_id=str(new_user.id))
+    
     return new_user
 
 
@@ -50,25 +55,31 @@ async def verify_email(
     request: Request,
     body: VerifyEmailRequestSchema,
     db: AsyncSession = Depends(get_db)
-    ):
+):
     query = select(User).where(User.email == body.email)
     result = await db.execute(query)
     user = result.scalar_one_or_none()
 
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-        
-    if user.is_verified:
-        return {"message": "Email is already verified"}
+    invalid_exc = HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST, 
+        detail="Invalid or expired verification request"
+    )
+
+    if not user or user.is_verified:
+        log.warning("verify_email_failed_user_invalid", email=body.email)
+        raise invalid_exc
         
     if not user.verification_code or not user.verification_expire:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No verification code found")
+        log.warning("verify_email_failed_no_code_set", email=body.email)
+        raise invalid_exc
 
     if datetime.now(timezone.utc) > user.verification_expire:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Verification code has expired")
+        log.warning("verify_email_failed_expired", email=body.email)
+        raise invalid_exc
 
     if not verify_password(body.code, user.verification_code):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid verification code")
+        log.warning("verify_email_failed_wrong_code", email=body.email)
+        raise invalid_exc
 
     # Mark as verified and cleanup
     user.is_verified = True
@@ -76,7 +87,10 @@ async def verify_email(
     user.verification_expire = None
     
     await db.commit()
+    log.info("email_verified_successfully", user_id=str(user.id))
+    
     return {"message": "Email successfully verified"}
+
 
 @router.post("/resend-verification")
 @limiter.limit("3/minute")
@@ -93,7 +107,12 @@ async def resend_verification(
     # Generic response prevents email enumeration attacks
     generic_response = {"message": "If that email exists and is unverified, a new code has been sent."}
 
-    if not user or user.is_verified:
+    if not user:
+        log.warning("resend_verification_ignored_user_not_found", email=body.email)
+        return generic_response
+        
+    if user.is_verified:
+        log.info("resend_verification_ignored_already_verified", user_id=str(user.id))
         return generic_response
 
     # Generate new OTP and overwrite existing
@@ -104,6 +123,8 @@ async def resend_verification(
     await db.commit()
     
     background_tasks.add_task(send_verification_email, user.email, raw_otp)
+    
+    log.info("verification_email_resent", user_id=str(user.id))
     
     return generic_response
 
@@ -121,9 +142,11 @@ async def login(
     user = result.scalar_one_or_none()
     
     if not user or not verify_password(form_data.password, user.hashed_password):
+        log.warning("login_failed_invalid_credentials", email=form_data.username)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Incorrect email or password")
     
     if not user.is_verified:
+        log.warning("login_failed_unverified_email", user_id=str(user.id))
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Please verify your email address to log in")
     
     access_token = create_access_token(user.id)
@@ -132,7 +155,7 @@ async def login(
     db_refresh_token = UserRefreshToken(
         user_id=user.id,
         token_jti=jti,
-        expires_at=datetime.now(timezone.utc) + timedelta(days=7)
+        expires_at=datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS) 
     )
     db.add(db_refresh_token)
     await db.commit()
@@ -144,7 +167,7 @@ async def login(
         httponly=True,
         secure=True,
         samesite="lax",
-        max_age=7*24*60*60 # 7 days (#TODO: change this env and fix max time)
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )
     response.set_cookie(
         key="refresh_token",
@@ -152,8 +175,10 @@ async def login(
         httponly=True,
         secure=True,
         samesite="lax",
-        max_age=7*24*60*60 # 7 days (#TODO: change this to env)
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
     )
+    
+    log.info("user_logged_in_successfully", user_id=str(user.id))
     
     return {"message": "Successfully logged in"}
 
@@ -168,12 +193,14 @@ async def refresh_token(request: Request, response: Response, db: AsyncSession =
     try:
         payload = jwt.decode(refresh_token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
         if payload.get("type") != "refresh":
+             log.warning("refresh_failed_invalid_type", path=request.url.path)
              raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
              
         user_id_str = payload.get("sub")
         jti = payload.get("jti")
         user_id = uuid.UUID(user_id_str)
-    except jwt.PyJWTError:
+    except jwt.PyJWTError as e:
+        log.warning("refresh_token_decode_failed", error=str(e))
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate refresh token")
 
     query = select(UserRefreshToken).where(
@@ -184,19 +211,27 @@ async def refresh_token(request: Request, response: Response, db: AsyncSession =
     db_token = result.scalar_one_or_none()
 
     if not db_token:
+        log.warning("refresh_failed_token_not_in_db_possible_reuse", user_id=str(user_id), jti=jti)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session invalid or expired")
-    await db.delete(db_token)
     
     new_access_token = create_access_token(user_id)
     new_refresh_token, new_jti = create_refresh_token(user_id)
 
-    db_new_token = UserRefreshToken(
-        user_id=user_id,
-        token_jti=new_jti,
-        expires_at=datetime.now(timezone.utc) + timedelta(days=7)
-    )
-    db.add(db_new_token)
-    await db.commit()
+    try:
+        await db.delete(db_token)
+        
+        db_new_token = UserRefreshToken(
+            user_id=user_id,
+            token_jti=new_jti,
+            expires_at=datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+        )
+        db.add(db_new_token)
+        await db.commit()
+
+    except Exception as e:
+        await db.rollback()
+        log.error("database_transaction_failed_during_refresh", error=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not refresh session")
 
     # Set new cookies
     response.set_cookie(
@@ -205,7 +240,7 @@ async def refresh_token(request: Request, response: Response, db: AsyncSession =
         httponly=True,
         secure=True,
         samesite="lax",
-        max_age=7*24*60*60 # 7 days (#TODO: change this to env and fix max time)
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )
     response.set_cookie(
         key="refresh_token",
@@ -213,8 +248,10 @@ async def refresh_token(request: Request, response: Response, db: AsyncSession =
         httponly=True,
         secure=True,
         samesite="lax",
-        max_age=7*24*60*60 # 7 days (#TODO: change this to env and fix max time)
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
     )
+
+    log.info("tokens_refreshed_successfully", user_id=str(user_id))
 
     return {"message": "Tokens refreshed successfully"}
 
@@ -225,17 +262,24 @@ async def logout(request: Request, response: Response, db: AsyncSession = Depend
     
     if refresh_token:
         try:
-            payload = jwt.decode(refresh_token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+            payload = jwt.decode(
+                refresh_token, 
+                settings.JWT_SECRET_KEY, 
+                algorithms=[settings.JWT_ALGORITHM],
+                options={"verify_exp": False} 
+            )
             jti = payload.get("jti")
             if jti:
                 query = delete(UserRefreshToken).where(UserRefreshToken.token_jti == jti)
                 await db.execute(query)
                 await db.commit()
-        except jwt.PyJWTError:
-            pass
+        except jwt.PyJWTError as e:
+            log.warning("logout_token_decode_failed", error=str(e))
 
-    response.delete_cookie(key="access_token")
-    response.delete_cookie(key="refresh_token")
+    response.delete_cookie(key="access_token", httponly=True, secure=True, samesite="lax")
+    response.delete_cookie(key="refresh_token", httponly=True, secure=True, samesite="lax")
+
+    log.info("user_logged_out_successfully")
 
     return {"message": "Successfully logged out"}
 
@@ -250,8 +294,10 @@ async def logout_all_devices(
     await db.execute(query)
     await db.commit()
 
-    response.delete_cookie(key="access_token")
-    response.delete_cookie(key="refresh_token")
+    response.delete_cookie(key="access_token", httponly=True, secure=True, samesite="lax")
+    response.delete_cookie(key="refresh_token", httponly=True, secure=True, samesite="lax")
+
+    log.info("user_logged_out_all_devices", user_id=str(current_user.id))
 
     return {
         "message": "Successfully logged out from all devices."
@@ -274,6 +320,7 @@ async def forgot_password(
     generic_response = {"message": "If that email exists in our system, a password reset code has been sent."}
 
     if not user:
+        log.warning("forgot_password_ignored_user_not_found", email=body.email)
         return generic_response
 
     # Generate new OTP, hash it, and set expiration
@@ -284,6 +331,8 @@ async def forgot_password(
     await db.commit()
     
     background_tasks.add_task(send_reset_password_email, user.email, raw_otp)
+    
+    log.info("password_reset_requested", user_id=str(user.id))
     
     return generic_response
 
@@ -299,20 +348,28 @@ async def reset_password(
     result = await db.execute(query)
     user = result.scalar_one_or_none()
 
+    invalid_exc = HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST, 
+        detail="Invalid or expired reset request"
+    )
+
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        log.warning("password_reset_failed_user_not_found", email=body.email)
+        raise invalid_exc
         
     if not user.resetpass_code or not user.resetpass_expire:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No password reset requested")
+        log.warning("password_reset_failed_no_request_active", email=body.email)
+        raise invalid_exc
 
     if datetime.now(timezone.utc) > user.resetpass_expire:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Reset code has expired")
+        log.warning("password_reset_failed_expired", email=body.email)
+        raise invalid_exc
 
     if not verify_password(body.code, user.resetpass_code):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid reset code")
+        log.warning("password_reset_failed_wrong_code", email=body.email)
+        raise invalid_exc
 
     user.hashed_password = get_password_hash(body.new_password)
-    
     user.resetpass_code = None
     user.resetpass_expire = None
     
@@ -321,5 +378,7 @@ async def reset_password(
     await db.execute(delete_sessions_query)
 
     await db.commit()
+    
+    log.info("password_reset_successful", user_id=str(user.id))
     
     return {"message": "Password has been reset successfully. All active sessions have been logged out."}

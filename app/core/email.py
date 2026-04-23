@@ -3,6 +3,7 @@ import secrets
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
 from pydantic import EmailStr
 from app.core.config import settings
+from app.core.logger import log
 
 conf = ConnectionConfig(
     MAIL_USERNAME=settings.MAIL_USERNAME,
@@ -26,7 +27,11 @@ async def send_verification_email(email_to: EmailStr, otp: str):
         subtype="html"
     )
     fm = FastMail(conf)
-    await fm.send_message(message)
+    try:
+        await fm.send_message(message)
+        log.info("verification_email_sent", email=email_to)
+    except Exception as e:
+        log.error("verification_email_failed", email=email_to, error=str(e))
 
 
 async def send_reset_password_email(email_to: EmailStr, otp: str):
@@ -37,4 +42,8 @@ async def send_reset_password_email(email_to: EmailStr, otp: str):
         subtype="html"
     )
     fm = FastMail(conf)
-    await fm.send_message(message)
+    try:
+        await fm.send_message(message)
+        log.info("reset_password_email_sent", email=email_to)
+    except Exception as e:
+        log.error("reset_password_email_failed", email=email_to, error=str(e))

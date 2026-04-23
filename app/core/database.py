@@ -3,7 +3,7 @@ from sqlalchemy.orm import DeclarativeBase
 from app.core.config import settings
 
 # Create async engine
-engine = create_async_engine(settings.database_url, echo=True)
+engine = create_async_engine(settings.database_url, echo=False)
 
 # Session factory
 AsyncSessionLocal = async_sessionmaker(
@@ -19,4 +19,8 @@ class Base(DeclarativeBase):
 # Dependency for FastAPI endpoints
 async def get_db():
     async with AsyncSessionLocal() as session:
-        yield session
+        try:
+            yield session
+        except Exception:
+            await session.rollback()
+            raise

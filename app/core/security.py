@@ -28,7 +28,7 @@ def create_access_token(subject: Union[str, Any]) -> str:
 
 def create_refresh_token(subject: Union[str, Any]) -> tuple[str, str]:
     jti = str(uuid.uuid4())
-    expire = datetime.now(timezone.utc) + timedelta(days=7)
+    expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode = {
         "exp": expire, 
         "sub": str(subject), 
