@@ -15,6 +15,7 @@ dependencies = [
     "fastapi-mail",
     "slowapi",
     "structlog",
+    "gunicorn",
 ]
 
 [dependency-groups]

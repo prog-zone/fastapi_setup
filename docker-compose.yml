@@ -26,7 +26,7 @@ services:
     env_file: .env
     environment:
       - DB_HOST=db
-    command: ./migrate.sh
+    command: alembic upgrade head
 
   api:
     build: .
