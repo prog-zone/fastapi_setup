@@ -9,7 +9,7 @@ from sqlalchemy import select, delete
 from app.core.logger import log
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.security import get_password_hash, verify_password, create_access_token, create_refresh_token
+from app.core.security import get_password_hash, verify_password, get_otp_hash, verify_otp_hash, create_access_token, create_refresh_token
 from app.core.limiter import limiter
 from app.api.deps import get_current_user
 from app.models.user import User, UserRefreshToken
@@ -35,7 +35,7 @@ async def register(user_in: UserCreateSchema, background_tasks: BackgroundTasks,
     new_user = User(
         email=user_in.email,
         hashed_password=get_password_hash(user_in.password),
-        verification_code=get_password_hash(raw_otp),
+        verification_code=get_otp_hash(raw_otp),
         verification_expire=datetime.now(timezone.utc) + timedelta(minutes=15)
     )
     
@@ -83,7 +83,7 @@ async def verify_email(
         log.warning("verify_email_failed_expired", email=body.email)
         raise invalid_exc
 
-    if not verify_password(body.code, user.verification_code):
+    if not verify_otp_hash(body.code, user.verification_code):
         log.warning("verify_email_failed_wrong_code", email=body.email)
         raise invalid_exc
 
@@ -92,7 +92,13 @@ async def verify_email(
     user.verification_code = None
     user.verification_expire = None
     
-    await db.commit()
+    try:
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        log.error("db_transaction_failed", error=str(e), path=request.url.path)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error occurred")
+    
     log.info("email_verified_successfully", user_id=str(user.id))
     
     return {"message": "Email successfully verified"}
@@ -125,8 +131,13 @@ async def resend_verification(
     raw_otp = generate_otp()
     user.verification_code = get_password_hash(raw_otp)
     user.verification_expire = datetime.now(timezone.utc) + timedelta(minutes=15)
-    
-    await db.commit()
+
+    try:
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        log.error("db_transaction_failed", error=str(e), path=request.url.path)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error occurred")
     
     background_tasks.add_task(send_verification_email, user.email, raw_otp)
     
@@ -346,8 +357,13 @@ async def forgot_password(
     raw_otp = generate_otp()
     user.resetpass_code = get_password_hash(raw_otp)
     user.resetpass_expire = datetime.now(timezone.utc) + timedelta(minutes=15)
-    
-    await db.commit()
+
+    try:
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        log.error("db_transaction_failed", error=str(e), path=request.url.path)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error occurred")
     
     background_tasks.add_task(send_reset_password_email, user.email, raw_otp)
     
@@ -393,10 +409,14 @@ async def reset_password(
     user.resetpass_expire = None
     
     # SECURITY CRITICAL: Invalidate all existing sessions (Logout from all devices)
-    delete_sessions_query = delete(UserRefreshToken).where(UserRefreshToken.user_id == user.id)
-    await db.execute(delete_sessions_query)
-
-    await db.commit()
+    try:
+        delete_sessions_query = delete(UserRefreshToken).where(UserRefreshToken.user_id == user.id)
+        await db.execute(delete_sessions_query)
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        log.error("db_transaction_failed", error=str(e), path=request.url.path)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error occurred")
     
     log.info("password_reset_successful", user_id=str(user.id))
     

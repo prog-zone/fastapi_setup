@@ -1,5 +1,6 @@
 import jwt
 import uuid
+import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Any, Union
 from pwdlib import PasswordHash
@@ -13,6 +14,12 @@ def get_password_hash(password: str) -> str:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return password_hash.verify(plain_password, hashed_password)
+
+def get_otp_hash(otp: str) -> str:
+    return hashlib.sha256(otp.encode()).hexdigest()
+
+def verify_otp_hash(plain_otp: str, hashed_otp: str) -> bool:
+    return hashlib.sha256(plain_otp.encode()).hexdigest() == hashed_otp
 
 def create_access_token(subject: Union[str, Any]) -> str:
     expire = datetime.now(timezone.utc) + timedelta(

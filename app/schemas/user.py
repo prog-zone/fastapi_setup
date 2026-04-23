@@ -1,8 +1,9 @@
-from pydantic import BaseModel, EmailStr, ConfigDict, Field, field_validator
+import re
 from uuid import UUID
 from datetime import datetime
 from typing import Optional
 from app.models.user import Role
+from pydantic import BaseModel, EmailStr, ConfigDict, Field, field_validator
 
 
 class UserBaseSchema(BaseModel):
