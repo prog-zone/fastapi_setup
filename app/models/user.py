@@ -39,8 +39,6 @@ class Profile(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True)
     
-    first_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    last_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     full_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     phone: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     location: Mapped[Optional[str]] = mapped_column(String, nullable=True)

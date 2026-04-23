@@ -12,7 +12,7 @@ from app.core.database import get_db
 from app.core.security import get_password_hash, verify_password, get_otp_hash, verify_otp_hash, create_access_token, create_refresh_token
 from app.core.limiter import limiter
 from app.api.deps import get_current_user
-from app.models.user import User, UserRefreshToken
+from app.models.user import User, Profile, UserRefreshToken
 from app.schemas.user import UserCreateSchema, UserSchema, UserBaseSchema, VerifyEmailRequestSchema, ForgotPasswordRequest, ResetPasswordRequest
 from app.core.email import send_verification_email, generate_otp, send_reset_password_email
 
@@ -36,7 +36,8 @@ async def register(user_in: UserCreateSchema, background_tasks: BackgroundTasks,
         email=user_in.email,
         hashed_password=get_password_hash(user_in.password),
         verification_code=get_otp_hash(raw_otp),
-        verification_expire=datetime.now(timezone.utc) + timedelta(minutes=15)
+        verification_expire=datetime.now(timezone.utc) + timedelta(minutes=15),
+        profile=Profile(full_name=user_in.full_name)
     )
     
     try:
