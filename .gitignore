@@ -213,3 +213,4 @@ pgadmin_data/
 
 # Local project state file
 project_state.md
+tests/

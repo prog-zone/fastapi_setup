@@ -32,7 +32,7 @@ async def cleanup_expired_tokens():
             
             log.info("expired_tokens_cleaned_successfully")
         except asyncio.CancelledError:
-            break
+            return
         except Exception as e:
             log.error("token_cleanup_failed", error=str(e))
 
@@ -64,7 +64,7 @@ app.add_middleware(
 
 
 """Formats rate limit errors into consistent JSON responses."""
-async def custom_rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+def custom_rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
     dummy_response = Response()
     dummy_response = request.app.state.limiter._inject_headers(
         dummy_response, request.state.view_rate_limit

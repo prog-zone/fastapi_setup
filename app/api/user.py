@@ -1,3 +1,4 @@
+from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -10,15 +11,17 @@ from app.schemas.user import UserFullSchema, ProfileSchema, ProfileUpdateSchema
 
 
 router = APIRouter(prefix="/user", tags=["user"])
+AsyncDbSession = Annotated[AsyncSession, Depends(get_db)]
+CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
 """Retrieve the authenticated user's full profile."""
 @router.get("/me", response_model=UserFullSchema)
 async def get_user_profile(
     request: Request,
-    current_user: User = Depends(get_current_user), 
-    db: AsyncSession = Depends(get_db)
-):
+    current_user: CurrentUser, 
+    db: AsyncDbSession
+    ):
     try:
         await db.refresh(current_user, ["profile"])
         return current_user
@@ -35,8 +38,8 @@ async def get_user_profile(
 async def update_profile(
     request: Request,
     profile_in: ProfileUpdateSchema,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    current_user: CurrentUser,
+    db: AsyncDbSession
 ):
     try:
         # 1. Fetch the profile
@@ -74,8 +77,8 @@ async def update_profile(
 async def delete_user_account(
     request: Request,
     response: Response,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: CurrentUser,
+    db: AsyncDbSession
 ):
     """
     Permanently delete the user account and all associated data.

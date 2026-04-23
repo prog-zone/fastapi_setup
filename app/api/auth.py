@@ -1,5 +1,6 @@
 import jwt
 import uuid
+from typing import Annotated
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -19,9 +20,11 @@ from app.core.email import send_verification_email, generate_otp, send_reset_pas
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+AsyncDbSession = Annotated[AsyncSession, Depends(get_db)]
+DB_ERROR_MSG = "Database error occurred"
 
 @router.post("/register", response_model=UserSchema)
-async def register(user_in: UserCreateSchema, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
+async def register(user_in: UserCreateSchema, background_tasks: BackgroundTasks, db: AsyncDbSession):
     # Check if user exists
     query = select(User).where(User.email == user_in.email)
     result = await db.execute(query)
@@ -61,7 +64,7 @@ async def register(user_in: UserCreateSchema, background_tasks: BackgroundTasks,
 async def verify_email(
     request: Request,
     body: VerifyEmailRequestSchema,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncDbSession
 ):
     query = select(User).where(User.email == body.email)
     result = await db.execute(query)
@@ -98,7 +101,7 @@ async def verify_email(
     except Exception as e:
         await db.rollback()
         log.error("db_transaction_failed", error=str(e), path=request.url.path)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error occurred")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=DB_ERROR_MSG)
     
     log.info("email_verified_successfully", user_id=str(user.id))
     
@@ -111,40 +114,32 @@ async def resend_verification(
     request: Request,
     body: UserBaseSchema,
     background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncDbSession
 ):
     query = select(User).where(User.email == body.email)
     result = await db.execute(query)
     user = result.scalar_one_or_none()
 
-    # Generic response prevents email enumeration attacks
-    generic_response = {"message": "If that email exists and is unverified, a new code has been sent."}
+    if user and not user.is_verified:
+        raw_otp = generate_otp()
+        user.verification_code = get_otp_hash(raw_otp)
+        user.verification_expire = datetime.now(timezone.utc) + timedelta(minutes=15)
 
-    if not user:
-        log.warning("resend_verification_ignored_user_not_found")
-        return generic_response
-        
-    if user.is_verified:
-        log.info("resend_verification_ignored_already_verified", user_id=str(user.id))
-        return generic_response
+        try:
+            await db.commit()
+            background_tasks.add_task(send_verification_email, user.email, raw_otp)
+            log.info("verification_email_resent", user_id=str(user.id))
+        except Exception as e:
+            await db.rollback()
+            log.error("db_transaction_failed", error=str(e), path=request.url.path)
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=DB_ERROR_MSG)
+    else:
+        if not user:
+            log.warning("resend_verification_ignored_user_not_found")
+        else:
+            log.info("resend_verification_ignored_already_verified", user_id=str(user.id))
 
-    # Generate new OTP and overwrite existing
-    raw_otp = generate_otp()
-    user.verification_code = get_otp_hash(raw_otp)
-    user.verification_expire = datetime.now(timezone.utc) + timedelta(minutes=15)
-
-    try:
-        await db.commit()
-    except Exception as e:
-        await db.rollback()
-        log.error("db_transaction_failed", error=str(e), path=request.url.path)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error occurred")
-    
-    background_tasks.add_task(send_verification_email, user.email, raw_otp)
-    
-    log.info("verification_email_resent", user_id=str(user.id))
-    
-    return generic_response
+    return {"message": "If that email exists and is unverified, a new code has been sent."}
 
 
 @router.post("/login")
@@ -152,7 +147,7 @@ async def resend_verification(
 async def login(
     request: Request,
     response: Response,
-    db: AsyncSession = Depends(get_db), 
+    db: AsyncDbSession, 
     form_data: OAuth2PasswordRequestForm = Depends()
 ):
     query = select(User).where(User.email == form_data.username)
@@ -212,7 +207,7 @@ async def login(
 
 @router.post("/refresh")
 @limiter.limit("3/minute")
-async def refresh_token(request: Request, response: Response, db: AsyncSession = Depends(get_db)):
+async def refresh_token(request: Request, response: Response, db: AsyncDbSession):
     refresh_token = request.cookies.get("refresh_token")
     if not refresh_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token missing")
@@ -288,7 +283,7 @@ async def refresh_token(request: Request, response: Response, db: AsyncSession =
 
 
 @router.post("/logout")
-async def logout(request: Request, response: Response, db: AsyncSession = Depends(get_db)):
+async def logout(request: Request, response: Response, db: AsyncDbSession):
     refresh_token = request.cookies.get("refresh_token")
     
     if refresh_token:
@@ -318,7 +313,7 @@ async def logout(request: Request, response: Response, db: AsyncSession = Depend
 @router.post("/logout-all")
 async def logout_all_devices(
     response: Response, 
-    db: AsyncSession = Depends(get_db),
+    db: AsyncDbSession,
     current_user: User = Depends(get_current_user)
 ):
     query = delete(UserRefreshToken).where(UserRefreshToken.user_id == current_user.id)
@@ -341,7 +336,7 @@ async def forgot_password(
     request: Request,
     body: ForgotPasswordRequest,
     background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncDbSession
 ):
     query = select(User).where(User.email == body.email)
     result = await db.execute(query)
@@ -364,7 +359,7 @@ async def forgot_password(
     except Exception as e:
         await db.rollback()
         log.error("db_transaction_failed", error=str(e), path=request.url.path)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error occurred")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=DB_ERROR_MSG)
     
     background_tasks.add_task(send_reset_password_email, user.email, raw_otp)
     
@@ -378,7 +373,7 @@ async def forgot_password(
 async def reset_password(
     request: Request,
     body: ResetPasswordRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncDbSession
 ):
     query = select(User).where(User.email == body.email)
     result = await db.execute(query)
@@ -417,7 +412,7 @@ async def reset_password(
     except Exception as e:
         await db.rollback()
         log.error("db_transaction_failed", error=str(e), path=request.url.path)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error occurred")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=DB_ERROR_MSG)
     
     log.info("password_reset_successful", user_id=str(user.id))
     
