@@ -26,7 +26,7 @@ async def register(user_in: UserCreateSchema, background_tasks: BackgroundTasks,
     query = select(User).where(User.email == user_in.email)
     result = await db.execute(query)
     if result.scalar_one_or_none():
-        log.warning("registration_failed_user_exists", email=user_in.email)
+        log.warning("registration_failed_user_exists")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User already exists")
     
     raw_otp = generate_otp()
@@ -72,19 +72,19 @@ async def verify_email(
     )
 
     if not user or user.is_verified:
-        log.warning("verify_email_failed_user_invalid", email=body.email)
+        log.warning("verify_email_failed_user_invalid")
         raise invalid_exc
         
     if not user.verification_code or not user.verification_expire:
-        log.warning("verify_email_failed_no_code_set", email=body.email)
+        log.warning("verify_email_failed_no_code_set")
         raise invalid_exc
 
     if datetime.now(timezone.utc) > user.verification_expire:
-        log.warning("verify_email_failed_expired", email=body.email)
+        log.warning("verify_email_failed_expired")
         raise invalid_exc
 
     if not verify_otp_hash(body.code, user.verification_code):
-        log.warning("verify_email_failed_wrong_code", email=body.email)
+        log.warning("verify_email_failed_wrong_code")
         raise invalid_exc
 
     # Mark as verified and cleanup
@@ -120,7 +120,7 @@ async def resend_verification(
     generic_response = {"message": "If that email exists and is unverified, a new code has been sent."}
 
     if not user:
-        log.warning("resend_verification_ignored_user_not_found", email=body.email)
+        log.warning("resend_verification_ignored_user_not_found")
         return generic_response
         
     if user.is_verified:
@@ -129,7 +129,7 @@ async def resend_verification(
 
     # Generate new OTP and overwrite existing
     raw_otp = generate_otp()
-    user.verification_code = get_password_hash(raw_otp)
+    user.verification_code = get_otp_hash(raw_otp)
     user.verification_expire = datetime.now(timezone.utc) + timedelta(minutes=15)
 
     try:
@@ -159,7 +159,7 @@ async def login(
     user = result.scalar_one_or_none()
     
     if not user or not verify_password(form_data.password, user.hashed_password):
-        log.warning("login_failed_invalid_credentials", email=form_data.username)
+        log.warning("login_failed_invalid_credentials")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Incorrect email or password")
     
     if not user.is_verified:
@@ -350,7 +350,7 @@ async def forgot_password(
     generic_response = {"message": "If that email exists in our system, a password reset code has been sent."}
 
     if not user:
-        log.warning("forgot_password_ignored_user_not_found", email=body.email)
+        log.warning("forgot_password_ignored_user_not_found")
         return generic_response
 
     # Generate new OTP, hash it, and set expiration
@@ -389,19 +389,19 @@ async def reset_password(
     )
 
     if not user:
-        log.warning("password_reset_failed_user_not_found", email=body.email)
+        log.warning("password_reset_failed_user_not_found")
         raise invalid_exc
         
     if not user.resetpass_code or not user.resetpass_expire:
-        log.warning("password_reset_failed_no_request_active", email=body.email)
+        log.warning("password_reset_failed_no_request_active")
         raise invalid_exc
 
     if datetime.now(timezone.utc) > user.resetpass_expire:
-        log.warning("password_reset_failed_expired", email=body.email)
+        log.warning("password_reset_failed_expired")
         raise invalid_exc
 
     if not verify_password(body.code, user.resetpass_code):
-        log.warning("password_reset_failed_wrong_code", email=body.email)
+        log.warning("password_reset_failed_wrong_code")
         raise invalid_exc
 
     user.hashed_password = get_password_hash(body.new_password)

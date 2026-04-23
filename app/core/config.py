@@ -5,18 +5,19 @@ class Settings(BaseSettings):
     PROJECT_NAME: str
     
     # CORS Configuration
-    BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:5173"]
+    BACKEND_CORS_ORIGINS: List[str]
 
     # Database Configuration
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str
     POSTGRES_DB: str
     DB_HOST: str = "localhost"
+    DB_PORT: int = 5432
 
     # JWT Configuration
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # kept 7 days for dev purpose, will be updated in prod to 15m
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # Email Configuration
@@ -28,7 +29,7 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
-        return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.DB_HOST}:5432/{self.POSTGRES_DB}"
+        return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.POSTGRES_DB}"
     
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
