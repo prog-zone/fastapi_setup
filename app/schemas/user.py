@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, ConfigDict, Field
+from pydantic import BaseModel, EmailStr, ConfigDict, Field, field_validator
 from uuid import UUID
 from datetime import datetime
 from typing import Optional
@@ -9,22 +9,22 @@ class UserBaseSchema(BaseModel):
     email: EmailStr
 
 class UserCreateSchema(UserBaseSchema):
-    password: str = Field(min_length=3) #TODO: password is kept simple for dev stage
+    password: str = Field(min_length=8)
 
-    # @field_validator('password')
-    # @classmethod
-    # def validate_password(cls, v: str) -> str:
-    #     if len(v) < 8:
-    #         raise ValueError("Password must be at least 8 characters long")
-    #     if not re.search(r"[A-Z]", v):
-    #         raise ValueError("Password must contain an uppercase letter")
-    #     if not re.search(r"[a-z]", v):
-    #         raise ValueError("Password must contain a lowercase letter")
-    #     if not re.search(r"\d", v):
-    #         raise ValueError("Password must contain a number")
-    #     if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", v):
-    #         raise ValueError("Password must contain a special character")
-    #     return v
+    @field_validator('password')
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must contain an uppercase letter")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("Password must contain a lowercase letter")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must contain a number")
+        if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", v):
+            raise ValueError("Password must contain a special character")
+        return v
 
 class UserSchema(UserBaseSchema):
     id: UUID
@@ -43,22 +43,22 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     email: EmailStr
     code: str
-    new_password: str = Field(min_length=3) #TODO: password is kept simple for dev stage
+    new_password: str = Field(min_length=8)
 
-    # @field_validator('password')
-    # @classmethod
-    # def validate_password(cls, v: str) -> str:
-    #     if len(v) < 8:
-    #         raise ValueError("Password must be at least 8 characters long")
-    #     if not re.search(r"[A-Z]", v):
-    #         raise ValueError("Password must contain an uppercase letter")
-    #     if not re.search(r"[a-z]", v):
-    #         raise ValueError("Password must contain a lowercase letter")
-    #     if not re.search(r"\d", v):
-    #         raise ValueError("Password must contain a number")
-    #     if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", v):
-    #         raise ValueError("Password must contain a special character")
-    #     return v
+    @field_validator('new_password')
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must contain an uppercase letter")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("Password must contain a lowercase letter")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must contain a number")
+        if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", v):
+            raise ValueError("Password must contain a special character")
+        return v
 
 class ProfileBaseSchema(BaseModel):
     first_name: Optional[str] = None

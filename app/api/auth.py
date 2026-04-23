@@ -191,7 +191,11 @@ async def login(
     
     log.info("user_logged_in_successfully", user_id=str(user.id))
     
-    return {"message": "Successfully logged in"}
+    return {
+        "access_token": access_token, 
+        "token_type": "bearer",
+        "message": "Successfully logged in"
+    }
 
 
 @router.post("/refresh")
@@ -217,13 +221,17 @@ async def refresh_token(request: Request, response: Response, db: AsyncSession =
     query = select(UserRefreshToken).where(
         UserRefreshToken.user_id == user_id, 
         UserRefreshToken.token_jti == jti
-    )
+    ).with_for_update()
+
     result = await db.execute(query)
     db_token = result.scalar_one_or_none()
 
     if not db_token:
-        log.warning("refresh_failed_token_not_in_db_possible_reuse", user_id=str(user_id), jti=jti)
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session invalid or expired")
+        log.warning("token_theft_detected_wiping_sessions", user_id=str(user_id))
+        wipe_query = delete(UserRefreshToken).where(UserRefreshToken.user_id == user_id)
+        await db.execute(wipe_query)
+        await db.commit()
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session compromised. Please log in again.")
     
     new_access_token = create_access_token(user_id)
     new_refresh_token, new_jti = create_refresh_token(user_id)
