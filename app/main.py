@@ -32,7 +32,7 @@ async def cleanup_expired_tokens():
             
             log.info("expired_tokens_cleaned_successfully")
         except asyncio.CancelledError:
-            return
+            raise
         except Exception as e:
             log.error("token_cleanup_failed", error=str(e))
 

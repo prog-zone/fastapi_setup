@@ -21,6 +21,8 @@ from app.core.email import send_verification_email, generate_otp, send_reset_pas
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 AsyncDbSession = Annotated[AsyncSession, Depends(get_db)]
+CurrentUser = Annotated[User, Depends(get_current_user)]
+LoginFormData = Annotated[OAuth2PasswordRequestForm, Depends()]
 DB_ERROR_MSG = "Database error occurred"
 
 @router.post("/register", response_model=UserSchema)
@@ -148,7 +150,7 @@ async def login(
     request: Request,
     response: Response,
     db: AsyncDbSession, 
-    form_data: OAuth2PasswordRequestForm = Depends()
+    form_data: LoginFormData
 ):
     query = select(User).where(User.email == form_data.username)
     result = await db.execute(query)
@@ -314,7 +316,7 @@ async def logout(request: Request, response: Response, db: AsyncDbSession):
 async def logout_all_devices(
     response: Response, 
     db: AsyncDbSession,
-    current_user: User = Depends(get_current_user)
+    current_user: CurrentUser
 ):
     query = delete(UserRefreshToken).where(UserRefreshToken.user_id == current_user.id)
     await db.execute(query)
@@ -342,30 +344,24 @@ async def forgot_password(
     result = await db.execute(query)
     user = result.scalar_one_or_none()
 
-    # Generic response to prevent email enumeration (hackers checking if an email exists)
-    generic_response = {"message": "If that email exists in our system, a password reset code has been sent."}
+    if user:
+        # Generate new OTP, hash it, and set expiration
+        raw_otp = generate_otp()
+        user.resetpass_code = get_password_hash(raw_otp)
+        user.resetpass_expire = datetime.now(timezone.utc) + timedelta(minutes=15)
 
-    if not user:
+        try:
+            await db.commit()
+            background_tasks.add_task(send_reset_password_email, user.email, raw_otp)
+            log.info("password_reset_requested", user_id=str(user.id))
+        except Exception as e:
+            await db.rollback()
+            log.error("db_transaction_failed", error=str(e), path=request.url.path)
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=DB_ERROR_MSG)
+    else:
         log.warning("forgot_password_ignored_user_not_found")
-        return generic_response
 
-    # Generate new OTP, hash it, and set expiration
-    raw_otp = generate_otp()
-    user.resetpass_code = get_password_hash(raw_otp)
-    user.resetpass_expire = datetime.now(timezone.utc) + timedelta(minutes=15)
-
-    try:
-        await db.commit()
-    except Exception as e:
-        await db.rollback()
-        log.error("db_transaction_failed", error=str(e), path=request.url.path)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=DB_ERROR_MSG)
-    
-    background_tasks.add_task(send_reset_password_email, user.email, raw_otp)
-    
-    log.info("password_reset_requested", user_id=str(user.id))
-    
-    return generic_response
+    return {"message": "If that email exists in our system, a password reset code has been sent."}
 
 
 @router.post("/reset-password")
