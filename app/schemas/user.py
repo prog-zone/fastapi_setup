@@ -28,6 +28,7 @@ class UserBaseSchema(BaseModel):
 
 class UserCreateSchema(UserBaseSchema):
     password: str = StrongPassword
+    full_name: str = Field(..., min_length=2, max_length=100)
 
 class UserSchema(UserBaseSchema):
     id: UUID

@@ -112,8 +112,8 @@ async def global_exception_handler(request: Request, exc: Exception):
 # Register all API endpoints under the /api/v1 prefix
 app.include_router(api_router, prefix="/api/v1")
 
-@app.get("/")
-def read_root():
+@app.get("/api/v1/health")
+def health_check():
     """Simple health check endpoint to verify the API is running."""
     log.info("health_check_accessed")
     return {"message": f"{settings.PROJECT_NAME} API is running"}
