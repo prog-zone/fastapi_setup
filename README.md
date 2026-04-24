@@ -52,7 +52,7 @@ A robust, async-first FastAPI starter template designed to accelerate the develo
 Clone the repository and set up your environment variables:
 
 ```bash
-git clone [https://github.com/prog-zone/fastapi_setup](https://github.com/prog-zone/fastapi_setup)
+git clone https://github.com/prog-zone/fastapi_setup
 cd fastapi-setup
 cp .env.example .env
 ```
