@@ -27,7 +27,7 @@ class UserBaseSchema(BaseModel):
     email: EmailStr
 
 class UserCreateSchema(UserBaseSchema):
-    password: str = StrongPassword
+    password: StrongPassword
     full_name: str = Field(..., min_length=2, max_length=100)
 
 class UserSchema(UserBaseSchema):
@@ -47,7 +47,7 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     email: EmailStr
     code: str
-    new_password: str = StrongPassword
+    new_password: StrongPassword
 
 class ProfileBaseSchema(BaseModel):
     full_name: Optional[str] = None
@@ -68,6 +68,10 @@ class ProfileCreateSchema(ProfileBaseSchema):
 
 class ProfileUpdateSchema(ProfileBaseSchema):
     pass
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: StrongPassword
 
 # Schema for full dashboard view (includes all nested data)
 class UserFullSchema(UserSchema):

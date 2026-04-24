@@ -28,7 +28,8 @@ def create_access_token(subject: Union[str, Any]) -> str:
     to_encode = {
         "exp": expire,
         "sub": str(subject),
-        "type": "access"
+        "type": "access",
+        "jti": str(uuid.uuid4())
         }
     return jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
