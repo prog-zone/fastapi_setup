@@ -161,7 +161,7 @@ async def test_login_rate_limiter():
     # Create a brand new transport and explicitly spoof the ASGI connection IP
     transport = ASGITransport(app=app, client=("123.45.67.89", 12345))
     
-    async with AsyncClient(transport=transport, base_url="http://testserver") as unique_ip_client:
+    async with AsyncClient(transport=transport, base_url="https://testserver") as unique_ip_client:
         payload = {
             "username": "spam@example.com",
             "password": "WrongPassword!"

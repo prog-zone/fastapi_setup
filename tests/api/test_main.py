@@ -12,7 +12,7 @@ async def test_health_check():
     # without needing to spin up a real live server.
     transport = ASGITransport(app=app)
     
-    async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
+    async with AsyncClient(transport=transport, base_url="https://testserver") as ac:
         response = await ac.get("/api/v1/health")
     
     # Assert we get a 200 OK
