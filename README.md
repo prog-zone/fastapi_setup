@@ -29,13 +29,13 @@ A robust, async-first FastAPI starter template designed to accelerate the develo
 
 ```text
 ├── app/
-│   ├── api/          # API routers, dependency injection, and permissions
-│   ├── core/         # App configuration, database setup, security, and logging
+│   ├── api/          # API routers and endpoints
+│   ├── core/         # App configuration, security, db setup, and logging
 │   ├── models/       # SQLAlchemy database models
-│   ├── schemas/      # Pydantic models for data validation
-│   └── services/     # Core business logic layer
-├── alembic/          # Database migration configurations and versions
-├── pyproject.toml    # Project metadata and dependencies (uv)
+│   ├── schemas/      # Pydantic models for request/response validation
+│   └── services/     # Business logic layer
+├── alembic/          # Database migration scripts
+├── pyproject.toml    # Project metadata and dependencies
 └── docker-compose.* # Docker orchestration files
 ```
 
