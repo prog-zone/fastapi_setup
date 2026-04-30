@@ -71,6 +71,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ARCHITECTURE NOTE: In a multi-worker setup (e.g., Gunicorn with 2+ workers), 
+# all workers will trigger this background task simultaneously. This is intentional.
+# PostgreSQL handles concurrent DELETE operations gracefully using row-level locks. 
+# One worker will delete the rows, and the others will safely execute a 0-row delete.
+# If scaling to massive traffic, consider migrating this to a dedicated cron job.
 
 """Formats rate limit errors into consistent JSON responses."""
 def custom_rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
