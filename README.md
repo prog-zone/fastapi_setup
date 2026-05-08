@@ -1,4 +1,4 @@
-# FastAPI Production-Ready Starter Template
+# FastAPI Production-Ready Blueprint
 
 ![Python](https://img.shields.io/badge/Python-3.13+-blue.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?logo=fastapi)
@@ -6,13 +6,13 @@
 ![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED.svg?logo=docker)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 
-A robust, async-first FastAPI starter template designed to accelerate the development of secure and scalable web applications. 
+A robust, async-first FastAPI Blueprint designed to accelerate the development of secure and scalable web applications. 
 
-## 💡 Why This Template?
+## 💡 Why This Blueprint?
 
 In today's fast-paced market, shipping quickly is a key selling point. I repeatedly found myself losing days deciding on project structures or setting up baseline authentication for FastAPI, sometimes even retreating to Django just for its "batteries-included" convenience.
 
-While third-party FastAPI auth libraries or massive boilerplates exist, they often hide the implementation details or come stuffed with bloat that takes days to strip away. I built this setup to solve that problem. It provides exactly what you need to start a new project—a highly secure, production-ready authentication and database foundation—while keeping the ultimate superpower of control entirely in your hands. Zero bloat, out-of-the-box security, and fast shipping.
+While third-party FastAPI auth libraries or massive boilerplates exist, they often hide the implementation details or come stuffed with bloat that takes days to strip away. I built this setup to solve that problem. It provides exactly what you need to start a new project, a highly secure, production-ready authentication and database foundation—while keeping the ultimate superpower of control entirely in your hands. Zero bloat, out-of-the-box security, and fast shipping.
 
 ## ✨ Key Features & Technical Details
 
@@ -23,13 +23,11 @@ While third-party FastAPI auth libraries or massive boilerplates exist, they oft
 * Argon2 password hashing via `pwdlib`.
 * Custom Pydantic validators enforcing strict password strength.
 
-
 * **User Management:** Registration, login, profile updates, and role-based access control (User, Admin, Superuser).
 * **Email Services:** Integrated OTP-based email verification and password reset flows using `fastapi-mail`.
 * **Security & Reliability:**
 * IP-based rate limiting via `slowapi` to prevent brute-force attacks.
 * Background tasks for automated database maintenance (e.g., cleaning expired tokens).
-
 
 * **Structured Logging:** Configured with `structlog` to output JSON logs, making it instantly compatible with observability stacks like ELK or Grafana Loki.
 * **Containerization:** Fully dockerized with `docker-compose` setups for both the API and a local PostgreSQL + pgAdmin environment.
@@ -77,7 +75,7 @@ cd fastapi_setup
 cp .env.example .env
 ```
 > **🔒 Pro-Tip: Commit your `uv.lock` file!**
-> Because this is a deployable application (not a PyPI library), you want **reproducible builds**. Make sure `uv.lock` is **removed** from your `.gitignore` and committed to your repository. This guarantees that your local machine, your CI/CD pipeline, and your production server are all running the exact same dependency versions, preventing the dreaded "it worked on my machine" bug.
+> Because this is a deployable application (not a PyPI library), you want **reproducible builds**. Make sure `uv.lock` is **removed** from your `.gitignore` and committed to your repository. This guarantees that your local machine and your production server are all running the exact same dependency versions, preventing the dreaded "it worked on my machine" bug 😎.
 
 
 ### 2. Choose Your Dev Workflow
