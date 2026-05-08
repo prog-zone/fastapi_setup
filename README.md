@@ -17,18 +17,10 @@ While third-party FastAPI auth libraries or massive boilerplates exist, they oft
 ## ✨ Key Features & Technical Details
 
 * **Modern Async Stack:** Fully asynchronous operations using FastAPI, SQLAlchemy 2.0 (Asyncpg), and Async Alembic migrations.
-* **Hardened Authentication:**
-* JWT-based auth utilizing **HttpOnly, Secure cookies** to prevent XSS.
-* **JTI-based refresh token rotation** with built-in token theft detection (automatically wipes compromised sessions).
-* Argon2 password hashing via `pwdlib`.
-* Custom Pydantic validators enforcing strict password strength.
-
+* **Hardened Authentication:** Features JWT-based auth with HttpOnly/Secure cookies, JTI-based refresh token rotation (with session wipe on theft), Argon2 password hashing via `pwdlib`, and strict Pydantic password validators.
 * **User Management:** Registration, login, profile updates, and role-based access control (User, Admin, Superuser).
 * **Email Services:** Integrated OTP-based email verification and password reset flows using `fastapi-mail`.
-* **Security & Reliability:**
-* IP-based rate limiting via `slowapi` to prevent brute-force attacks.
-* Background tasks for automated database maintenance (e.g., cleaning expired tokens).
-
+* **Security & Reliability:** Utilizes IP-based rate limiting via `slowapi` to prevent brute-force attacks, alongside background tasks for automated database maintenance.
 * **Structured Logging:** Configured with `structlog` to output JSON logs, making it instantly compatible with observability stacks like ELK or Grafana Loki.
 * **Containerization:** Fully dockerized with `docker-compose` setups for both the API and a local PostgreSQL + pgAdmin environment.
 * **Dependency Management:** Uses `uv` for incredibly fast package management and dependency resolution.
