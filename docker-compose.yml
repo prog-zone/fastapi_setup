@@ -15,11 +15,19 @@ services:
       timeout: 5s
       retries: 5
     volumes:
-      - ./postgres_data:/var/lib/postgresql/data
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    logging: &default-logging
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   migration:
     build: .
-    container_name: ${PROJECT_NAME}_migration
+    image: ${PROJECT_NAME}_api:${APP_VERSION}
+    container_name: ${PROJECT_NAME}_migration_${APP_VERSION}
     depends_on:
       db:
         condition: service_healthy
@@ -27,9 +35,13 @@ services:
     environment:
       - DB_HOST=db
     command: alembic upgrade head
+    networks:
+      - internal
+    logging: *default-logging
 
   api:
     build: .
+    image: ${PROJECT_NAME}_api:${APP_VERSION}
     container_name: ${PROJECT_NAME}_api
     restart: always
     depends_on:
@@ -40,3 +52,13 @@ services:
       - DB_HOST=db
     ports:
       - "127.0.0.1:8000:8000"
+    networks:
+      - internal
+    logging: *default-logging
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  db_data:

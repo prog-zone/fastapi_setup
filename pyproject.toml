@@ -3,7 +3,7 @@ name = "fastapi-setup"
 version = "0.1.0"
 description = "A starter template for FastAPI"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.13"
 dependencies = [
     "fastapi[standard]",
     "sqlalchemy",

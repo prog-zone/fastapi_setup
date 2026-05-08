@@ -11,13 +11,12 @@ ENV UV_COMPILE_BYTECODE=1 \
     PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1
 
-COPY pyproject.toml .
-RUN uv sync --no-install-project --no-dev
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-install-project --no-dev
 
-COPY . .
+COPY --chown=appuser:appuser . .
 
-RUN uv sync --no-dev && \
-    chown -R appuser:appuser /app
+RUN uv sync --frozen --no-dev
 
 USER appuser
 
