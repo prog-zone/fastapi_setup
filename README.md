@@ -10,7 +10,7 @@ A robust, async-first FastAPI Blueprint designed to accelerate the development o
 
 ## 💡 Why This Blueprint?
 
-In today's fast-paced market, shipping quickly is a key selling point. I repeatedly found myself losing days deciding on project structures or setting up baseline authentication for FastAPI, sometimes even retreating to Django just for its "batteries-included" convenience.
+In today's fast-paced market, shipping quickly is a key selling point. I repeatedly found myself losing days deciding on project structures or setting up baseline authentication for FastAPI, sometimes even falling back to heavier frameworks just for their "batteries-included" convenience.
 
 While third-party FastAPI auth libraries or massive boilerplates exist, they often hide the implementation details or come stuffed with bloat that takes days to strip away. I built this setup to solve that problem. It provides exactly what you need to start a new project, a highly secure, production-ready authentication and database foundation—while keeping the ultimate superpower of control entirely in your hands. Zero bloat, out-of-the-box security, and fast shipping.
 
