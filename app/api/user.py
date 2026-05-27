@@ -13,8 +13,9 @@ from app.schemas.user import UserFullSchema, ProfileSchema, ProfileUpdateSchema,
 
 
 router = APIRouter(prefix="/user", tags=["user"])
-AsyncDbSession = Annotated[AsyncSession, Depends(get_db)]
-CurrentUser = Annotated[User, Depends(get_current_user)]
+
+type AsyncDbSession = Annotated[AsyncSession, Depends(get_db)]
+type CurrentUser = Annotated[User, Depends(get_current_user)]
 DB_ERROR_MSG = "Database error occurred"
 
 
