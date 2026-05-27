@@ -18,6 +18,7 @@ dependencies = [
     "gunicorn",
     "authlib",
     "httpx",
+    "itsdangerous",
 ]
 
 [dependency-groups]

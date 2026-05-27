@@ -1,8 +1,8 @@
 """initial
 
-Revision ID: 9d8ceaa5dd7c
+Revision ID: fa7ddb2fa56a
 Revises: 
-Create Date: 2026-05-10 15:59:28.108899
+Create Date: 2026-05-27 15:28:04.796818
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '9d8ceaa5dd7c'
+revision: str = 'fa7ddb2fa56a'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -24,8 +24,10 @@ def upgrade() -> None:
     op.create_table('users',
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('email', sa.String(), nullable=False),
-    sa.Column('hashed_password', sa.String(), nullable=False),
+    sa.Column('hashed_password', sa.String(), nullable=True),
     sa.Column('role', sa.Enum('USER', 'ADMIN', 'SUPERUSER', name='role'), nullable=False),
+    sa.Column('auth_provider', sa.String(), nullable=False),
+    sa.Column('external_id', sa.String(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('is_verified', sa.Boolean(), nullable=False),
     sa.Column('verification_code', sa.String(), nullable=True),
@@ -35,6 +37,7 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
+    op.create_index(op.f('ix_users_external_id'), 'users', ['external_id'], unique=True)
     op.create_table('profiles',
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('user_id', sa.UUID(), nullable=False),
@@ -69,6 +72,7 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_user_refresh_tokens_token_jti'), table_name='user_refresh_tokens')
     op.drop_table('user_refresh_tokens')
     op.drop_table('profiles')
+    op.drop_index(op.f('ix_users_external_id'), table_name='users')
     op.drop_index(op.f('ix_users_email'), table_name='users')
     op.drop_table('users')
     # ### end Alembic commands ###

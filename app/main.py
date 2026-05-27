@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from slowapi.errors import RateLimitExceeded
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
+from starlette.middleware.sessions import SessionMiddleware
 
 from app.core.logger import log
 from app.api.router import api_router
@@ -61,6 +62,12 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     return response
 
+# Session middleware for SSO state management
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.JWT_SECRET_KEY,
+    max_age=3600  # 1 hour
+)
 
 # Configure CORS for frontend connections
 app.add_middleware(
