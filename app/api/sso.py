@@ -32,7 +32,7 @@ oauth.register(
 
 router = APIRouter(prefix="/auth/sso", tags=["sso"])
 
-@router.get("/login/{provider}")
+@router.get("/{provider}/login")
 async def sso_login(provider: str, request: Request):
     client = oauth.create_client(provider)
     if not client:
@@ -40,11 +40,11 @@ async def sso_login(provider: str, request: Request):
     redirect_uri = request.url_for('sso_callback', provider=provider)
     return await client.authorize_redirect(request, redirect_uri)
 
-@router.get("/callback/{provider}")
+@router.get("/{provider}/callback")
 async def sso_callback(
-    provider: str, 
-    request: Request, 
-    response: Response, 
+    provider: str,
+    request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db)
 ):
     client = oauth.create_client(provider)
