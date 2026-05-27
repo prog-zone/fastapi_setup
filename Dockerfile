@@ -20,4 +20,4 @@ RUN uv sync --frozen --no-dev
 
 USER appuser
 
-CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "--workers", "2", "--bind", "0.0.0.0:8000", "app.main:app"]
+CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "--workers", "2", "--bind", "0.0.0.0:8000", "--forwarded-allow-ips", "*", "app.main:app"]
