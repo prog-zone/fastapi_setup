@@ -16,6 +16,9 @@ dependencies = [
     "slowapi",
     "structlog",
     "gunicorn",
+    "authlib",
+    "httpx",
+    "itsdangerous",
 ]
 
 [dependency-groups]

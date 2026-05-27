@@ -20,9 +20,9 @@ from app.core.email import send_verification_email, generate_otp, send_reset_pas
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-AsyncDbSession = Annotated[AsyncSession, Depends(get_db)]
-CurrentUser = Annotated[User, Depends(get_current_user)]
-LoginFormData = Annotated[OAuth2PasswordRequestForm, Depends()]
+type AsyncDbSession = Annotated[AsyncSession, Depends(get_db)]
+type CurrentUser = Annotated[User, Depends(get_current_user)]
+type LoginFormData = Annotated[OAuth2PasswordRequestForm, Depends()]
 DB_ERROR_MSG = "Database error occurred"
 
 @router.post("/register", response_model=UserSchema)
