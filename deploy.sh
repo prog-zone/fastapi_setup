@@ -52,7 +52,7 @@ if docker ps --format '{{.Names}}' | grep -q "${PROJECT_NAME}_db"; then
 fi
 
 # 7. Build and Deploy
-docker compose build
-docker compose up -d
+docker-compose build
+docker-compose up -d
 
 echo "✅ Successfully deployed $PROJECT_NAME:$VERSION"
