@@ -1,9 +1,11 @@
 #!/bin/bash
 set -e
 
+PY_BIN=".venv/bin/python"
+
 # 1. Pull metadata from the static pyproject.toml
-PROJECT_NAME=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['name'])")
-TOML_VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+PROJECT_NAME=$($PY_BIN -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['name'])")
+TOML_VERSION=$($PY_BIN -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
 
 # 2. Pull currently running version from Docker
 RUNNING_VERSION=$(docker ps --filter "name=${PROJECT_NAME}_api" --format "{{.Image}}" | cut -d':' -f2)
